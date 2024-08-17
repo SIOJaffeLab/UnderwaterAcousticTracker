@@ -2,98 +2,147 @@ import serial.tools.list_ports as port_list
 import time
 import serial 
 import threading
+import sys
+
+from loguru import logger
 
 from mmp_defs import *  # Import the command class
 
+TIME_DELAY = 5
+NUMBER_OF_RANGES =  10
+REMOTE_MODEM_ID = 0
+JOIN_THREAD_TIME = 2
+
+
+def setup_logger():
+    logger.level("SER_IN", no=50, color="<magenta><bold>", icon='->->->')
+    logger.level("SER_OUT", no=50, color="<magenta><bold>", icon='<-<-<-<')
 
 def find_ports():
     ports = list(port_list.comports())
     if not ports:
-        print("No serial ports found")
+        logger.error("No serial ports found")
         return None
     for p in ports:
         try:
-            print("trying", p)
+            logger.debug("trying " + str(p))
+
             # filter out non possible modem connections
             if (p.__str__()[-3:] == 'n/a'):
-                print("N/A port")
+                logger.warning(str(p) + "is a N/A port")
                 continue
 
 
             #try connecting to the serial port 
+            logger.debug("Connecting to " + str(p.device))
             ser = serial.Serial(p.device, 9600, timeout=1)
             if ser.is_open:
-                print("Connected to", p.device)
+                logger.success("Connected to " + str(p.device))
                 return ser 
             ser.close()
 
         except serial.SerialException as exception:
-            print("failed to connect to", p.device, exception)
+            logger.critical("failed to connect to " + str(p.device) + str(exception))
 
+def send_command(serial_connection, command):
+    try:
+        serial_connection.write(bytearray(str(command)+'\r','ascii'))
+        logger.log("SER_OUT", str(command))
+    except:
+        logger.error("Couldn't send" + str(command) + "over serial")
 
 
 def send_ranging_command(serial_connection, modem_id):
-    print("going into command mode")
-    serial_connection.write(bytearray('+++\r','ascii'))
-    print("going into datalog mode")
-    serial_connection.write(bytearray('@OpMode=DataLog\r','ascii'))
-    print("get underwater connection properties")
-    serial_connection.write(bytearray('ATX0\r','ascii'))
+    #    print("going into datalog mode")
+    #    serial_connection.write(bytearray('@OpMode=DataLog\r','ascii'))
 
-    for _ in range(100):
+    logger.debug("Getting underwater connection properties")
+    send_command(serial_connection, "ATX"+str(modem_id))
+    logger.info("Sleeping for " + str(TIME_DELAY) + " seconds")
+    time.sleep(TIME_DELAY)
 
-        print("Sending Ranging Command")
-        serial_connection.write(bytearray('atr0\r','ascii'))
+    try:
+        for i in range(NUMBER_OF_RANGES):
 
-        time.sleep(5)
+            logger.debug("Sending Ranging Command: " + str(i))
+            send_command(serial_connection, "atr"+str(modem_id))
 
+            logger.info("Sleeping for " + str(TIME_DELAY) + " seconds")
+            time.sleep(TIME_DELAY)
 
-
+        logger.success("Done Ranging " + str(NUMBER_OF_RANGES) + " times")
+        logger.debug("Joining display_input_thread")
+        display_input_thread.join(2)
+    except KeyboardInterrupt:
+        logger.critical("Keyboard Interrupt\n Exiting...")
+    finally:
+        try:
+            logger.debug("Joining display_input_thread")
+            display_input_thread.join(2)
+            logger.debug("Joining ranging thread")
+            send_range_thread.join(2)
+        except Exception as e:
+            logger.error("Couldn't kill thread due to error: " + str(e))
+            pass
+        logger.success("Done! Exiting!")
+        logger.debug("Closing Serial Connection (This will Errror Out)")
+        #TODO: Find More Graceful way to exit the thread
+        serial_connection.close()
+        serial_connection = None
+        
 def display_input(serial_connection, send_range_thread):
     started_ranging = False
     data_out = None
     if not  serial_connection:
-        print("Error: Bad Serial Connection")
+        logger.critical("Error: Bad Serial Connection")
         raise
         return
     try:
-        while True:
+        while serial_connection.is_open:
             try:
                 data_out = serial_connection.readline().decode('utf-8').strip()
             except:
-                print("couldn't decode", serial_connection.readline())
+                try:
+                    logger.error("couldn't decode " + str(serial_connection.readline()))
+                except:
+                    logger.error("Having problems with the serial_connection")
+
+            if not started_ranging:
+                send_command(serial_connection, "+++")
+                
             if data_out:
-                print(data_out)
-                if not started_ranging and data_out[:7]=='CONNECT':
-                    time.sleep(5)
+                logger.log("SER_IN", data_out)
+
+                if not started_ranging and data_out[:5] == 'user:':
+                    logger.debug("Booted and in Command Mode")
+                    logger.info("Sleeping for "+str(TIME_DELAY)+" seconds")
+                    time.sleep(TIME_DELAY)
                     started_ranging = True
                     send_range_thread.start()
-                    
-
-
-                    
-
 
     except KeyboardInterrupt:
-        print("Keyboard Interrupt\n Exiting...")
+        logger.critical("Keyboard Interrupt\n Exiting...")
     finally:
         try:
-            send_range_thread.join()
+            send_range_thread.join(2)
         except:
             pass
         serial_connection.close()
 
 
-ser = find_ports()
-send_range_thread = threading.Thread(target=send_ranging_command, args=(ser, 1,))
-display_input_thread = threading.Thread(target=display_input, args=(ser,send_range_thread))
+if __name__ == "__main__":
+    setup_logger()
+    ser = find_ports()
+    logger.debug("Creating Threads")
+    send_range_thread = threading.Thread(target=send_ranging_command, args=(ser, REMOTE_MODEM_ID,))
+    display_input_thread = threading.Thread(target=display_input, args=(ser,send_range_thread))
 
-# wait for bootup
+    # wait for bootup
 
-#display input while sending range command
-display_input_thread.start()
-#send_range_thread.start()
+    #display input while sending range command
+    logger.debug("Starting Display Input Thread")
+    display_input_thread.start()
+    #send_range_thread.start()
 
 
-#close threads
-display_input_thread.join()
+    #close threads
