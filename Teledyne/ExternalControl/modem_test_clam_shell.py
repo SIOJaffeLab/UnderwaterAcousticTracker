@@ -5,6 +5,7 @@ import threading
 import sys
 
 from loguru import logger
+from pathlib import Path
 
 from mmp_defs import *  # Import the command class
 
@@ -18,7 +19,7 @@ JOIN_THREAD_TIME = 2
 
 def setup_logger():
     current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_filename = f"log_{current_time}.log"
+    log_filename = Path('./logs/' + f"log_{current_time}.log")
 
     logger.level("SER_IN", no=50, color="<magenta><bold>", icon='->->->')
     logger.level("SER_OUT", no=50, color="<magenta><bold>", icon='<-<-<-<')
