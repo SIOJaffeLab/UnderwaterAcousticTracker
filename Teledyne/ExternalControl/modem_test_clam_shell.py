@@ -8,6 +8,8 @@ from loguru import logger
 
 from mmp_defs import *  # Import the command class
 
+from datetime import datetime
+
 TIME_DELAY = 5
 NUMBER_OF_RANGES =  10
 REMOTE_MODEM_ID = 0
@@ -15,8 +17,13 @@ JOIN_THREAD_TIME = 2
 
 
 def setup_logger():
+    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_filename = f"log_{current_time}.log"
+
     logger.level("SER_IN", no=50, color="<magenta><bold>", icon='->->->')
     logger.level("SER_OUT", no=50, color="<magenta><bold>", icon='<-<-<-<')
+
+    logger.add(log_filename, colorize = True, format="{time:MMMM D, YYYY > HH:mm:ss} | {level} | {message} ")
 
 def find_ports():
     ports = list(port_list.comports())
