@@ -12,6 +12,7 @@ from mmp_defs import *  # Import the command class
 from datetime import datetime
 
 TIME_DELAY = 5
+BOOT_DELAY = 50
 NUMBER_OF_RANGES =  10
 REMOTE_MODEM_ID = 0
 JOIN_THREAD_TIME = 2
@@ -64,10 +65,11 @@ def send_ranging_command(serial_connection, modem_id):
     #    print("going into datalog mode")
     #    serial_connection.write(bytearray('@OpMode=DataLog\r','ascii'))
 
+    logger.info("Sleeping for " + str(BOOT_DELAY) + " seconds to boot")
+    time.sleep(BOOT_DELAY)
+
     logger.debug("Getting underwater connection properties")
     send_command(serial_connection, "ATX"+str(modem_id))
-    logger.info("Sleeping for " + str(TIME_DELAY) + " seconds")
-    time.sleep(TIME_DELAY)
 
     try:
         for i in range(NUMBER_OF_RANGES):

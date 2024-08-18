@@ -13,7 +13,7 @@ def setup_logger():
 
     # Add custom log levels for SER_IN and SER_OUT
     logger.level("SER_IN", no=SER_IN_LEVEL, color="<magenta><bold>", icon="->->->")
-    logger.level("SER_OUT", no=SER_OUT_LEVEL, color="<cyan><bold>", icon="<-<-<-")
+    logger.level("SER_OUT", no=SER_OUT_LEVEL, color="<magenta><bold>", icon="<-<-<-")
 
 class LogHandler(FileSystemEventHandler):
     def __init__(self, log_file):
