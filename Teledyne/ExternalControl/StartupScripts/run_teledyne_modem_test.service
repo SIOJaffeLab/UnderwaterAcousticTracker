@@ -1,0 +1,12 @@
+[Unit]
+Description=Runs Modem Test On Boot
+After=network.target
+
+[Service]
+ExecStart=/bin/bash /home/rpi/UnderwaterAcousticTracker/Teledyne/ExternalControl/StartupScripts/run_from_service.sh
+StandardOutput=journal
+StandardError=journal
+User=rpi
+
+[Install]
+WantedBy=multi-user.target
